@@ -1,1 +1,373 @@
-
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "BLOB_を作成する_(V2)": {
+                "inputs": {
+                    "body": "@body('パスによるファイル_コンテンツの取得')",
+                    "headers": {
+                        "ReadFileMetadataFromServer": true
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azureblob']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://',parameters('blob_strage_account_name'),'.blob.core.windows.net/'))}/files",
+                    "queries": {
+                        "folderPath": "@parameters('blob_pass')",
+                        "name": "@triggerBody()?['attachments'][0]['name']",
+                        "queryParametersSingleEncoded": true
+                    }
+                },
+                "runAfter": {
+                    "パスによるファイル_コンテンツの取得": [
+                        "Succeeded"
+                    ]
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                },
+                "type": "ApiConnection"
+            },
+            "Initialize-variable-count": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "count",
+                            "type": "integer",
+                            "value": 1
+                        }
+                    ]
+                },
+                "runAfter": {},
+                "type": "InitializeVariable"
+            },
+            "Initialize-variable-output": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "output",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize-variable-shouldExit": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Initialize-variable-shouldExit": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "shouldExit",
+                            "type": "boolean",
+                            "value": false
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize-variable-count": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Until": {
+                "actions": {
+                    "Condition": {
+                        "actions": {
+                            "Append_to_string_variable": {
+                                "inputs": {
+                                    "name": "output",
+                                    "value": "@body('HTTP-AzureOpenAI')?['choices'][0]?['message']?['content']"
+                                },
+                                "runAfter": {
+                                    "HTTP-AzureOpenAI": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "AppendToStringVariable"
+                            },
+                            "Delay-copy-copy": {
+                                "inputs": {
+                                    "interval": {
+                                        "count": 30,
+                                        "unit": "Second"
+                                    }
+                                },
+                                "type": "Wait"
+                            },
+                            "HTTP-AzureOpenAI": {
+                                "inputs": {
+                                    "authentication": {
+                                        "audience": "https://cognitiveservices.azure.com",
+                                        "type": "ManagedServiceIdentity"
+                                    },
+                                    "body": {
+                                        "messages": [
+                                            {
+                                                "content": "You are a talented assistant who will help create scripts for audio content for the visually impaired. When creating a manuscript, we output it in a form that is easy to read aloud and understand the meaning.",
+                                                "role": "system"
+                                            },
+                                            {
+                                                "content": "<prompt><instraction>I will provide you with the OCR result of one page of a document as input, and you will need to generate a transcript based on the subsequent requirements.<instraction><Requirements>- Output in Japanese. \n- What is provided is the result of OCR, and the layout may be distorted. You will create the manuscript to be read aloud, taking into account the layout distortion. \n- The output manuscript will ultimately be used as a voice read aloud file. Therefore, output everything as text, and if there are any items that are inappropriate as read aloud data, such as bullet points, convert them into text that is easy to understand by reading aloud. \n- No information other than the formatted manuscript is required for the output.</Requirements><OCR result>@{body('HTTP-GET-Document-Intelligence-layout')['analyzeResult']['content']}</OCR result></prompt>Output:",
+                                                "role": "user"
+                                            }
+                                        ]
+                                    },
+                                    "headers": {
+                                        "Content-Type": "application/json"
+                                    },
+                                    "method": "POST",
+                                    "uri": "https://@{parameters('aoai-resource-name')}.openai.azure.com/openai/deployments/@{parameters('aoai-model-name')}/chat/completions?api-version=@{parameters('aoai-api-version')}"
+                                },
+                                "runAfter": {
+                                    "HTTP-GET-Document-Intelligence-layout": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Http"
+                            },
+                            "HTTP-GET-Document-Intelligence-layout": {
+                                "inputs": {
+                                    "headers": {
+                                        "Ocp-Apim-Subscription-Key": "@{parameters('document-intelligence-key')}"
+                                    },
+                                    "method": "GET",
+                                    "uri": "https://@{parameters('document-intelligence-name')}.cognitiveservices.azure.com/formrecognizer/documentModels/prebuilt-layout/analyzeResults/@{outputs('HTTP-POST-Document-Intelligence-layout')?['headers']['apim-request-id']}?api-version=2023-07-31"
+                                },
+                                "runAfter": {
+                                    "Delay-copy-copy": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "runtimeConfiguration": {
+                                    "contentTransfer": {
+                                        "transferMode": "Chunked"
+                                    }
+                                },
+                                "type": "Http"
+                            },
+                            "Increment_variable": {
+                                "inputs": {
+                                    "name": "count",
+                                    "value": 1
+                                },
+                                "runAfter": {
+                                    "Append_to_string_variable": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "IncrementVariable"
+                            }
+                        },
+                        "else": {
+                            "actions": {
+                                "Set_variable": {
+                                    "inputs": {
+                                        "name": "shouldExit",
+                                        "value": true
+                                    },
+                                    "type": "SetVariable"
+                                }
+                            }
+                        },
+                        "expression": {
+                            "and": [
+                                {
+                                    "equals": [
+                                        "@outputs('HTTP-POST-Document-Intelligence-layout')?['statusCode']",
+                                        202
+                                    ]
+                                }
+                            ]
+                        },
+                        "runAfter": {
+                            "HTTP-POST-Document-Intelligence-layout": [
+                                "Succeeded",
+                                "Failed"
+                            ]
+                        },
+                        "type": "If"
+                    },
+                    "HTTP-POST-Document-Intelligence-layout": {
+                        "inputs": {
+                            "body": {
+                                "urlSource": "https://@{parameters('blob_strage_account_name')}.blob.core.windows.net/@{parameters('blob_pass')}/@{triggerBody()?['attachments'][0]['name']}"
+                            },
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "Ocp-Apim-Subscription-Key": "@{parameters('document-intelligence-key')}"
+                            },
+                            "method": "POST",
+                            "uri": "https://@{parameters('document-intelligence-name')}.cognitiveservices.azure.com/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31&pages=@{variables('count')}"
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        },
+                        "type": "Http"
+                    }
+                },
+                "expression": "@equals(variables('shouldExit'),true)",
+                "limit": {
+                    "count": 10,
+                    "timeout": "PT1H"
+                },
+                "runAfter": {
+                    "BLOB_を作成する_(V2)": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Until"
+            },
+            "チャネル内のメッセージで応答します": {
+                "inputs": {
+                    "body": {
+                        "messageBody": "<p class=\"editor-paragraph\">@{variables('output')}</p>",
+                        "parentMessageId": "@triggerBody()?['id']",
+                        "recipient": {
+                            "channelId": "***",
+                            "groupId": "***"
+                        }
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['teams']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/v1.0/teams/conversation/replyWithMessage/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+                },
+                "runAfter": {
+                    "Until": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection"
+            },
+            "パスによるファイル_コンテンツの取得": {
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://sudoadmin.sharepoint.com/sites/dev-taguchi-ask'))}/GetFileContentByPath",
+                    "queries": {
+                        "inferContentType": true,
+                        "path": "/Shared Documents/@{parameters('teams_channel')}/@{triggerBody()['attachments'][0]['name']}",
+                        "queryParametersSingleEncoded": true
+                    }
+                },
+                "runAfter": {
+                    "Initialize-variable-output": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            },
+            "aoai-api-version": {
+                "defaultValue": "2024-02-15-preview",
+                "type": "String"
+            },
+            "aoai-model-name": {
+                "defaultValue": "gpt-4o",
+                "type": "String"
+            },
+            "aoai-resource-name": {
+                "defaultValue": "***",
+                "type": "String"
+            },
+            "blob_pass": {
+                "defaultValue": "***",
+                "type": "String"
+            },
+            "blob_strage_account_name": {
+                "defaultValue": "***",
+                "type": "String"
+            },
+            "document-intelligence-key": {
+                "defaultValue": "***",
+                "type": "String"
+            },
+            "document-intelligence-name": {
+                "defaultValue": "***",
+                "type": "String"
+            },
+            "teams_channel": {
+                "defaultValue": "***",
+                "type": "String"
+            }
+        },
+        "triggers": {
+            "チャネルに新しいメッセージが追加されたとき": {
+                "evaluatedRecurrence": {
+                    "frequency": "Minute",
+                    "interval": 1
+                },
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['teams']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/trigger/beta/teams/@{encodeURIComponent('6deba866-f687-45e8-b55a-d02e1b6cf329')}/channels/@{encodeURIComponent('19:966bcc28ea774e8b8e0dbc52b4fc592a@thread.tacv2')}/messages",
+                    "queries": {
+                        "$top": 50
+                    }
+                },
+                "recurrence": {
+                    "frequency": "Minute",
+                    "interval": 1
+                },
+                "splitOn": "@triggerBody()",
+                "type": "ApiConnection"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "azureblob": {
+                    "connectionId": "/subscriptions/aaa1088f-5850-4bf9-9835-f7f7f37670a6/resourceGroups/dev-taguchi-stgpj/providers/Microsoft.Web/connections/azureblob",
+                    "connectionName": "azureblob",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    },
+                    "id": "/subscriptions/aaa1088f-5850-4bf9-9835-f7f7f37670a6/providers/Microsoft.Web/locations/eastus/managedApis/azureblob"
+                },
+                "sharepointonline": {
+                    "connectionId": "***e",
+                    "connectionName": "sharepointonline",
+                    "id": "***"
+                },
+                "teams": {
+                    "connectionId": "***",
+                    "connectionName": "teams",
+                    "id": "***"
+                }
+            }
+        }
+    }
+}
