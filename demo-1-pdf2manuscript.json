@@ -262,7 +262,7 @@
                         }
                     },
                     "method": "get",
-                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://sudoadmin.sharepoint.com/sites/dev-taguchi-ask'))}/GetFileContentByPath",
+                    "path": "***",
                     "queries": {
                         "inferContentType": true,
                         "path": "/Shared Documents/@{parameters('teams_channel')}/@{triggerBody()['attachments'][0]['name']}",
@@ -330,7 +330,7 @@
                         }
                     },
                     "method": "get",
-                    "path": "/trigger/beta/teams/@{encodeURIComponent('6deba866-f687-45e8-b55a-d02e1b6cf329')}/channels/@{encodeURIComponent('19:966bcc28ea774e8b8e0dbc52b4fc592a@thread.tacv2')}/messages",
+                    "path": "***",
                     "queries": {
                         "$top": 50
                     }
@@ -348,14 +348,14 @@
         "$connections": {
             "value": {
                 "azureblob": {
-                    "connectionId": "/subscriptions/aaa1088f-5850-4bf9-9835-f7f7f37670a6/resourceGroups/dev-taguchi-stgpj/providers/Microsoft.Web/connections/azureblob",
+                    "connectionId": "***",
                     "connectionName": "azureblob",
                     "connectionProperties": {
                         "authentication": {
                             "type": "ManagedServiceIdentity"
                         }
                     },
-                    "id": "/subscriptions/aaa1088f-5850-4bf9-9835-f7f7f37670a6/providers/Microsoft.Web/locations/eastus/managedApis/azureblob"
+                    "id": "***"
                 },
                 "sharepointonline": {
                     "connectionId": "***e",
