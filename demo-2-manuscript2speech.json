@@ -1,0 +1,174 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Delay-copy": {
+                "inputs": {
+                    "interval": {
+                        "count": 30,
+                        "unit": "Second"
+                    }
+                },
+                "runAfter": {
+                    "HTTP-PUT-Azure-AI-Speech": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Wait"
+            },
+            "HTTP-GET-Azure-AI-Speech": {
+                "inputs": {
+                    "authentication": {
+                        "audience": "https://cognitiveservices.azure.com",
+                        "type": "ManagedServiceIdentity"
+                    },
+                    "method": "GET",
+                    "uri": "https://@{parameters('speech-searvice-name')}.cognitiveservices.azure.com/texttospeech/batchsyntheses/@{body('チャネル内のメッセージで応答します')?['id']}?api-version=2024-04-01"
+                },
+                "runAfter": {
+                    "Delay-copy": [
+                        "Succeeded"
+                    ]
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                },
+                "type": "Http"
+            },
+            "HTTP-PUT-Azure-AI-Speech": {
+                "inputs": {
+                    "authentication": {
+                        "audience": "https://cognitiveservices.azure.com",
+                        "type": "ManagedServiceIdentity"
+                    },
+                    "body": {
+                        "description": "my ssml test",
+                        "inputKind": "SSML",
+                        "inputs": [
+                            {
+                                "content": "<speak version=\"1.0\" xml:lang=\"ja-JP\"><voice name=\"ja-JP-NanamiNeural\">@{triggerBody()?['body']?['content']}</voice></speak>"
+                            }
+                        ],
+                        "properties": {
+                            "concatenateResult": false,
+                            "decompressOutputFiles": false,
+                            "outputFormat": "audio-24khz-96kbitrate-mono-mp3",
+                            "sentenceBoundaryEnabled": false,
+                            "wordBoundaryEnabled": false
+                        }
+                    },
+                    "method": "PUT",
+                    "uri": "https://@{parameters('speech-searvice-name')}.cognitiveservices.azure.com/texttospeech/batchsyntheses/@{body('チャネル内のメッセージで応答します')?['id']}?api-version=2024-04-01"
+                },
+                "runAfter": {
+                    "チャネル内のメッセージで応答します": [
+                        "Succeeded"
+                    ]
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                },
+                "type": "Http"
+            },
+            "チャネル内のメッセージで応答します": {
+                "inputs": {
+                    "body": {
+                        "messageBody": "<p>処理を受け付けました。処理には数分かかる場合がありますので、他の作業をしながらお待ちください。</p>",
+                        "parentMessageId": "@triggerBody()?['id']",
+                        "recipient": {
+                            "channelId": "***",
+                            "groupId": "***"
+                        }
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['teams']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/v1.0/teams/conversation/replyWithMessage/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Channel')}"
+                },
+                "runAfter": {},
+                "type": "ApiConnection"
+            },
+            "チャネル内のメッセージで応答します-2": {
+                "inputs": {
+                    "body": {
+                        "messageBody": "<p>処理が完了しました。下記のURLから音声ファイルをダウンロードしてください。ダウンロード期限は今から72時間です。</p><br><p><a href=\"https://\">@{body('HTTP-GET-Azure-AI-Speech')['outputs']['result']}</a></p>",
+                        "parentMessageId": "@triggerBody()?['id']",
+                        "recipient": {
+                            "channelId": "***",
+                            "groupId": "***"
+                        }
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['teams']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/v1.0/teams/conversation/replyWithMessage/poster/@{encodeURIComponent('Flow bot')}/location/@{encodeURIComponent('Channel')}"
+                },
+                "runAfter": {
+                    "HTTP-GET-Azure-AI-Speech": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            },
+            "speech-searvice-name": {
+                "defaultValue": "your-speech-searvice-name",
+                "type": "String"
+            }
+        },
+        "triggers": {
+            "チャネルに新しいメッセージが追加されたとき": {
+                "evaluatedRecurrence": {
+                    "frequency": "Minute",
+                    "interval": 3
+                },
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['teams']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "***",
+                    "queries": {
+                        "$top": 50
+                    }
+                },
+                "recurrence": {
+                    "frequency": "Minute",
+                    "interval": 3
+                },
+                "splitOn": "@triggerBody()",
+                "type": "ApiConnection"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "teams": {
+                    "connectionId": "***",
+                    "connectionName": "***",
+                    "id": "***"
+                }
+            }
+        }
+    }
+}
